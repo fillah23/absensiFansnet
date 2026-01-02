@@ -49,7 +49,7 @@
                             </thead>
                             <tbody>
                                 @forelse ($absensis as $absensi)
-                                <tr>
+                                <tr class="{{ $absensi->status == 'telat' ? 'table-warning' : '' }}">
                                     <td>{{ $absensi->tanggal->format('d/m/Y') }}</td>
                                     <td>{{ $absensi->tanggal->locale('id')->translatedFormat('l') }}</td>
                                     <td>
@@ -70,7 +70,7 @@
                                         @if($absensi->status == 'hadir')
                                             <span class="badge bg-success">Hadir</span>
                                         @elseif($absensi->status == 'telat')
-                                            <span class="badge bg-warning">Telat</span>
+                                            <span class="badge bg-warning text-dark"><i class="bi bi-clock-history"></i> Telat (Tidak dapat bonus)</span>
                                         @else
                                             <span class="badge bg-danger">Tidak Hadir</span>
                                         @endif

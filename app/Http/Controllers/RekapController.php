@@ -12,8 +12,8 @@ class RekapController extends Controller
 {
     public function index(Request $request)
     {
-        $bulan = $request->get('bulan', date('m'));
-        $tahun = $request->get('tahun', date('Y'));
+        $bulan = intval($request->get('bulan', date('m')));
+        $tahun = intval($request->get('tahun', date('Y')));
 
         $karyawans = Karyawan::active()->get();
         $rekap = [];
@@ -27,7 +27,8 @@ class RekapController extends Controller
             $hadir = $absensis->where('status', 'hadir')->count();
             $telat = $absensis->where('status', 'telat')->count();
             $totalKehadiran = $hadir + $telat;
-            $bonus = $totalKehadiran * $bonusPerKehadiran;
+            // Bonus hanya dihitung dari yang hadir tepat waktu, yang telat tidak dapat bonus
+            $bonus = $hadir * $bonusPerKehadiran;
             
             // Ambil foto masuk terakhir
             $fotoTerakhir = $absensis->where('foto_masuk', '!=', null)
@@ -55,8 +56,8 @@ class RekapController extends Controller
 
     public function detail(Request $request, $karyawanId)
     {
-        $bulan = $request->get('bulan', date('m'));
-        $tahun = $request->get('tahun', date('Y'));
+        $bulan = intval($request->get('bulan', date('m')));
+        $tahun = intval($request->get('tahun', date('Y')));
 
         $karyawan = Karyawan::findOrFail($karyawanId);
         $absensis = Absensi::byKaryawan($karyawanId)

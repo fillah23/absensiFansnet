@@ -115,8 +115,9 @@
             
             <div class="alert alert-info py-2 small mb-3">
                 <i class="bi bi-clock"></i> 
-                <strong>Jam Absen Masuk:</strong> {{ $jamMasukMulai }} - {{ $jamMasukSelesai }} | 
-                <strong>Jam Absen Keluar:</strong> {{ $jamKeluarMulai }} - {{ $jamKeluarSelesai }}
+                <strong>Tepat Waktu:</strong> {{ $jamMasukMulai }} - {{ $jamMasukSelesai }} (dapat bonus) | 
+                <strong>Telat:</strong> Setelah {{ $jamMasukSelesai }} (tidak dapat bonus) | 
+                <strong>Absen Keluar:</strong> Kapan saja
             </div>
         </div>
 
@@ -261,28 +262,8 @@
 
         // Validasi batas waktu absensi
         function validateTime(jenisAbsensi) {
-            const now = new Date();
-            const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-            
-            if (jenisAbsensi === 'masuk') {
-                if (currentTime < JAM_MASUK_MULAI || currentTime > JAM_MASUK_SELESAI) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Di Luar Jam Absen!',
-                        html: `Absen masuk hanya bisa dilakukan antara jam <strong>${JAM_MASUK_MULAI} - ${JAM_MASUK_SELESAI}</strong><br>Sekarang jam <strong>${currentTime}</strong>`,
-                    });
-                    return false;
-                }
-            } else {
-                if (currentTime < JAM_KELUAR_MULAI || currentTime > JAM_KELUAR_SELESAI) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Di Luar Jam Absen!',
-                        html: `Absen keluar hanya bisa dilakukan antara jam <strong>${JAM_KELUAR_MULAI} - ${JAM_KELUAR_SELESAI}</strong><br>Sekarang jam <strong>${currentTime}</strong>`,
-                    });
-                    return false;
-                }
-            }
+            // Tidak ada validasi waktu untuk absen masuk maupun keluar
+            // Bisa absen kapan saja, sistem akan otomatis menentukan status (hadir/telat)
             return true;
         }
 

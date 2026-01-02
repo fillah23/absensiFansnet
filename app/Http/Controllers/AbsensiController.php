@@ -110,17 +110,8 @@ class AbsensiController extends Controller
             'longitude' => 'required|numeric',
         ]);
 
-        // Cek batas waktu absen masuk
-        $jamMasukMulai = Pengaturan::get('jam_masuk_mulai', '06:00');
-        $jamMasukSelesai = Pengaturan::get('jam_masuk_selesai', '09:00');
-        $waktuSekarang = Carbon::now()->format('H:i');
-        
-        if ($waktuSekarang < $jamMasukMulai || $waktuSekarang > $jamMasukSelesai) {
-            return response()->json([
-                'success' => false, 
-                'message' => "Absen masuk hanya bisa dilakukan antara jam {$jamMasukMulai} - {$jamMasukSelesai}. Sekarang jam {$waktuSekarang}"
-            ], 403);
-        }
+        // Tidak ada validasi waktu - bisa absen masuk kapan saja
+        // Jika lewat jam selesai akan masuk sebagai "telat"
 
         // Cek IP (3 segmen pertama saja)
         $ipKantor = Pengaturan::get('ip_kantor');
@@ -208,17 +199,8 @@ class AbsensiController extends Controller
             'longitude' => 'required|numeric',
         ]);
 
-        // Cek batas waktu absen keluar
-        $jamKeluarMulai = Pengaturan::get('jam_keluar_mulai', '16:00');
-        $jamKeluarSelesai = Pengaturan::get('jam_keluar_selesai', '20:00');
-        $waktuSekarang = Carbon::now()->format('H:i');
-        
-        if ($waktuSekarang < $jamKeluarMulai || $waktuSekarang > $jamKeluarSelesai) {
-            return response()->json([
-                'success' => false, 
-                'message' => "Absen keluar hanya bisa dilakukan antara jam {$jamKeluarMulai} - {$jamKeluarSelesai}. Sekarang jam {$waktuSekarang}"
-            ], 403);
-        }
+        // Tidak ada validasi waktu untuk absen keluar - bisa kapan saja setelah absen masuk
+        // Karyawan bisa pulang lebih awal atau lembur
 
         // Cek IP (3 segmen pertama saja)
         $ipKantor = Pengaturan::get('ip_kantor');

@@ -103,10 +103,26 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Jam Batas Absen Masuk <span class="text-danger">*</span></label>
+                                    <label class="form-label fw-bold">Jam Batas Absen Masuk Tepat Waktu <span class="text-danger">*</span></label>
                                     <input type="time" class="form-control" name="jam_masuk_selesai" 
                                            value="{{ $pengaturans['jam_masuk_selesai']->value ?? '09:00' }}" required>
-                                    <small class="text-muted">Batas akhir absen masuk. Lewat jam ini dianggap telat atau tidak bisa absen</small>
+                                    <small class="text-muted">Batas akhir absen masuk tepat waktu. Lewat jam ini dianggap telat</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Jam Batas Maksimal Telat <span class="text-danger">*</span></label>
+                                    <input type="time" class="form-control" name="jam_masuk_batas_telat" 
+                                           value="{{ $pengaturans['jam_masuk_batas_telat']->value ?? '12:00' }}" required>
+                                    <small class="text-muted">Batas maksimal masih bisa absen (status telat). Lewat jam ini tidak bisa absen</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-warning mb-0 py-2 small">
+                                    <i class="bi bi-exclamation-triangle"></i> <strong>Catatan:</strong> Karyawan yang absen telat tidak mendapat bonus kehadiran
                                 </div>
                             </div>
                         </div>

@@ -71,7 +71,8 @@
                 <div class="card-body">
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i> 
-                        <strong>Bonus per Kehadiran:</strong> Rp {{ number_format($bonusPerKehadiran, 0, ',', '.') }}
+                        <strong>Bonus per Kehadiran:</strong> Rp {{ number_format($bonusPerKehadiran, 0, ',', '.') }}<br>
+                        <small class="text-muted"><i class="bi bi-exclamation-triangle"></i> Karyawan yang telat tidak mendapat bonus kehadiran</small>
                     </div>
 
                     <div class="table-responsive">
