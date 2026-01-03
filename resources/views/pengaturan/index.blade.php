@@ -26,6 +26,51 @@
                     <form action="{{ route('pengaturan.update') }}" method="POST">
                         @csrf
                         
+                        <!-- Toggle Validasi IP -->
+                        <div class="card border-warning mb-4">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1"><i class="bi bi-shield-lock"></i> Validasi IP WiFi Kantor</h6>
+                                        <small class="text-muted">Mengharuskan karyawan terhubung ke WiFi kantor untuk absensi</small>
+                                    </div>
+                                    <div class="form-check form-switch" style="font-size: 1.5rem;">
+                                        <input class="form-check-input" type="checkbox" role="switch" 
+                                               id="ipValidationToggle" name="ip_validation_enabled" 
+                                               value="1"
+                                               {{ ($pengaturans['ip_validation_enabled']->value ?? '1') == '1' ? 'checked' : '' }}
+                                               onchange="toggleIpValidation(this)">
+                                        <label class="form-check-label" for="ipValidationToggle"></label>
+                                    </div>
+                                </div>
+                                <div id="ipStatusBadge" class="mt-2">
+                                    <span class="badge bg-{{ ($pengaturans['ip_validation_enabled']->value ?? '1') == '1' ? 'success' : 'secondary' }}">
+                                        {{ ($pengaturans['ip_validation_enabled']->value ?? '1') == '1' ? '✓ Validasi IP Aktif' : '✗ Validasi IP Nonaktif' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="ipSettingsContainer" style="display: {{ ($pengaturans['ip_validation_enabled']->value ?? '1') == '1' ? 'block' : 'none' }};">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">IP WiFi Kantor <span class="text-danger ip-required">*</span></label>
+                                        <input type="text" class="form-control" name="ip_kantor" id="ip_kantor"
+                                               value="{{ $pengaturans['ip_kantor']->value ?? '' }}" 
+                                               placeholder="172.22.4.1">
+                                        <small class="text-muted">IP address WiFi kantor yang diizinkan untuk absensi</small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="alert alert-info mb-0 py-2 small">
+                                        <i class="bi bi-info-circle"></i> Sistem akan validasi 3 segmen pertama saja (contoh: 172.22.4.x)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -149,7 +194,7 @@
                         <div class="alert alert-info">
                             <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Informasi Penting:</h6>
                             <ul class="mb-0">
-                                <li><strong>IP WiFi Kantor:</strong> Sistem akan validasi 3 segmen pertama saja (contoh: 172.22.4.x, digit terakhir bebas)</li>
+                                <li id="ipValidationInfo" style="display: {{ ($pengaturans['ip_validation_enabled']->value ?? '1') == '1' ? 'list-item' : 'none' }};"><strong>IP WiFi Kantor:</strong> Sistem akan validasi 3 segmen pertama saja (contoh: 172.22.4.x, digit terakhir bebas)</li>
                                 <li><strong>Pilih Lokasi di Peta:</strong> Klik pada peta di atas untuk memilih lokasi kantor. Koordinat akan terisi otomatis.</li>
                                 <li><strong>Batas Waktu:</strong> Karyawan hanya bisa absen dalam rentang waktu yang ditentukan</li>
                                 <li><strong>Gunakan GPS:</strong> Klik tombol "📍 Gunakan Lokasi Saya" untuk menggunakan lokasi GPS Anda saat ini</li>
@@ -460,5 +505,30 @@ document.addEventListener('DOMContentLoaded', function() {
         radius: previewRadius
     }).addTo(previewMap);
 });
+
+// Toggle IP Validation Function
+function toggleIpValidation(checkbox) {
+    const ipSettingsContainer = document.getElementById('ipSettingsContainer');
+    const ipValidationInfo = document.getElementById('ipValidationInfo');
+    const ipStatusBadge = document.getElementById('ipStatusBadge');
+    const ipKantorInput = document.getElementById('ip_kantor');
+    const ipRequired = document.querySelectorAll('.ip-required');
+    
+    if (checkbox.checked) {
+        // Aktifkan validasi IP
+        ipSettingsContainer.style.display = 'block';
+        ipValidationInfo.style.display = 'list-item';
+        ipKantorInput.setAttribute('required', 'required');
+        ipRequired.forEach(el => el.style.display = 'inline');
+        ipStatusBadge.innerHTML = '<span class="badge bg-success">✓ Validasi IP Aktif</span>';
+    } else {
+        // Nonaktifkan validasi IP
+        ipSettingsContainer.style.display = 'none';
+        ipValidationInfo.style.display = 'none';
+        ipKantorInput.removeAttribute('required');
+        ipRequired.forEach(el => el.style.display = 'none');
+        ipStatusBadge.innerHTML = '<span class="badge bg-secondary">✗ Validasi IP Nonaktif</span>';
+    }
+}
 </script>
 @endsection

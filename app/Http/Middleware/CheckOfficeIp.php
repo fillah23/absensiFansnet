@@ -16,6 +16,14 @@ class CheckOfficeIp
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Cek apakah validasi IP diaktifkan
+        $ipValidationEnabled = Pengaturan::get('ip_validation_enabled', '1');
+        
+        // Jika validasi IP dinonaktifkan, skip validasi
+        if ($ipValidationEnabled != '1') {
+            return $next($request);
+        }
+        
         $ipKantor = Pengaturan::get('ip_kantor');
         $clientIp = $request->ip();
 
