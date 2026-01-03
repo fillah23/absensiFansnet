@@ -18,10 +18,12 @@ class AbsensiController extends Controller
         // Cek apakah validasi IP diaktifkan
         $ipValidationEnabled = Pengaturan::get('ip_validation_enabled', '1');
         
+        // Set default value untuk ipKantor
+        $ipKantor = Pengaturan::get('ip_kantor', '0.0.0.0');
+        
         // Jika validasi IP aktif, lakukan pengecekan
         if ($ipValidationEnabled == '1') {
             // Validasi IP dulu sebelum menampilkan halaman
-            $ipKantor = Pengaturan::get('ip_kantor');
             $clientIp = request()->ip();
             
             // Bypass validation untuk localhost dalam development mode
