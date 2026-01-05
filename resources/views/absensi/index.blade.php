@@ -124,15 +124,37 @@
         <!-- Status Box -->
         <div id="statusBox" style="display: none;"></div>
 
+        <!-- Info Status Karyawan -->
+        <div id="karyawanStatusInfo" class="alert alert-warning py-2 small mb-3" style="display: none;">
+            <i class="bi bi-info-circle"></i> <span id="karyawanStatusText"></span>
+        </div>
+
         <!-- Form Absensi -->
         <div class="mb-3">
             <label class="form-label fw-bold">Pilih Nama Karyawan</label>
             <select id="karyawanSelect" class="form-select" style="width: 100%;">
                 <option value="">-- Pilih Karyawan --</option>
                 @foreach($karyawans as $karyawan)
-                    <option value="{{ $karyawan->id }}">{{ $karyawan->nama }} - {{ $karyawan->jabatan }}</option>
+                    @php
+                        $absensi = $absensisHariIni->get($karyawan->id);
+                        $statusIcon = '';
+                        if ($absensi) {
+                            if ($absensi->jam_masuk && $absensi->jam_keluar) {
+                                $statusIcon = '✅ ';
+                            } elseif ($absensi->jam_masuk) {
+                                $statusIcon = '🟢 ';
+                            }
+                        }
+                    @endphp
+                    <option value="{{ $karyawan->id }}" 
+                            data-absen-masuk="{{ $absensi && $absensi->jam_masuk ? $absensi->jam_masuk->format('H:i') : '' }}"
+                            data-absen-keluar="{{ $absensi && $absensi->jam_keluar ? $absensi->jam_keluar->format('H:i') : '' }}"
+                            data-status="{{ $absensi && $absensi->status ? $absensi->status : '' }}">
+                        {{ $statusIcon }}{{ $karyawan->nama }} - {{ $karyawan->jabatan }}
+                    </option>
                 @endforeach
             </select>
+            <small class="text-muted">🟢 = Sudah absen masuk | ✅ = Sudah absen masuk & keluar</small>
         </div>
 
         <!-- Tombol Jenis Absensi -->
@@ -205,6 +227,42 @@
                 placeholder: '-- Pilih Karyawan --',
                 allowClear: true,
                 width: '100%'
+            });
+
+            // Event listener ketika karyawan dipilih
+            $('#karyawanSelect').on('change', function() {
+                const selectedOption = $(this).find('option:selected');
+                const karyawanId = $(this).val();
+                const infoBox = $('#karyawanStatusInfo');
+                const infoText = $('#karyawanStatusText');
+                
+                if (!karyawanId) {
+                    infoBox.hide();
+                    return;
+                }
+                
+                const absenMasuk = selectedOption.data('absen-masuk');
+                const absenKeluar = selectedOption.data('absen-keluar');
+                const status = selectedOption.data('status');
+                const namaKaryawan = selectedOption.text().replace(/[🟢✅]/g, '').trim();
+                
+                if (absenMasuk && absenKeluar) {
+                    // Sudah absen masuk dan keluar
+                    infoBox.removeClass('alert-warning alert-success').addClass('alert-info');
+                    infoText.html(`<strong>${namaKaryawan}</strong> sudah absen <strong>MASUK</strong> (${absenMasuk}) dan <strong>KELUAR</strong> (${absenKeluar}) hari ini.`);
+                    infoBox.show();
+                } else if (absenMasuk) {
+                    // Sudah absen masuk, belum keluar
+                    let statusText = status === 'telat' ? '(Telat)' : '(Tepat Waktu)';
+                    infoBox.removeClass('alert-info alert-warning').addClass('alert-success');
+                    infoText.html(`<strong>${namaKaryawan}</strong> sudah absen <strong>MASUK</strong> pada ${absenMasuk} ${statusText}. Belum absen keluar.`);
+                    infoBox.show();
+                } else {
+                    // Belum absen sama sekali
+                    infoBox.removeClass('alert-info alert-success').addClass('alert-warning');
+                    infoText.html(`<strong>${namaKaryawan}</strong> belum melakukan absensi hari ini.`);
+                    infoBox.show();
+                }
             });
         });
 
@@ -455,29 +513,43 @@
                 return;
             }
 
-            // Set canvas size sama dengan video
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            // Set canvas size - resize untuk mengurangi ukuran file
+            const maxWidth = 1024; // Max width untuk gambar
+            const maxHeight = 768; // Max height untuk gambar
+            
+            let width = video.videoWidth;
+            let height = video.videoHeight;
+            
+            // Resize jika lebih besar dari max
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = width * ratio;
+                height = height * ratio;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
 
             // Draw video ke canvas
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, width, height);
 
             // Tambahkan watermark
             const datetime = new Date().toLocaleString('id-ID');
             const location = `Lat: ${currentPosition.latitude.toFixed(6)}, Long: ${currentPosition.longitude.toFixed(6)}`;
 
             ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(10, canvas.height - 70, canvas.width - 20, 60);
+            ctx.fillRect(10, height - 70, width - 20, 60);
 
             ctx.fillStyle = 'white';
             ctx.font = 'bold 16px Arial';
-            ctx.fillText(datetime, 20, canvas.height - 45);
+            ctx.fillText(datetime, 20, height - 45);
             ctx.font = '14px Arial';
-            ctx.fillText(location, 20, canvas.height - 20);
+            ctx.fillText(location, 20, height - 20);
 
-            // Convert to base64
-            capturedImage = canvas.toDataURL('image/png');
+            // Convert to base64 dengan kualitas JPEG lebih rendah untuk ukuran lebih kecil
+            // Gunakan JPEG dengan quality 0.7 untuk balance antara kualitas dan ukuran
+            capturedImage = canvas.toDataURL('image/jpeg', 0.7);
 
             // Show preview
             previewImage.src = capturedImage;

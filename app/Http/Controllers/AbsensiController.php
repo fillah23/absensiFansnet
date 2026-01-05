@@ -62,6 +62,13 @@ class AbsensiController extends Controller
         }
         
         $karyawans = Karyawan::active()->orderBy('nama')->get();
+        
+        // Ambil data absensi hari ini untuk semua karyawan
+        $today = Carbon::today();
+        $absensisHariIni = Absensi::whereDate('tanggal', $today)
+            ->get()
+            ->keyBy('karyawan_id');
+        
         $latKantor = Pengaturan::get('latitude_kantor');
         $longKantor = Pengaturan::get('longitude_kantor');
         $radius = Pengaturan::get('radius_absen');
@@ -70,7 +77,7 @@ class AbsensiController extends Controller
         $jamKeluarMulai = Pengaturan::get('jam_keluar_mulai', '16:00');
         $jamKeluarSelesai = Pengaturan::get('jam_keluar_selesai', '20:00');
 
-        return view('absensi.index', compact('karyawans', 'ipKantor', 'latKantor', 'longKantor', 'radius', 
+        return view('absensi.index', compact('karyawans', 'absensisHariIni', 'ipKantor', 'latKantor', 'longKantor', 'radius', 
             'jamMasukMulai', 'jamMasukSelesai', 'jamKeluarMulai', 'jamKeluarSelesai'));
     }
 
@@ -180,35 +187,45 @@ class AbsensiController extends Controller
             return response()->json(['success' => false, 'message' => 'Anda sudah absen masuk hari ini'], 400);
         }
 
-        // Simpan foto dengan watermark
-        $fotoPath = $this->saveFotoWithWatermark($request->foto, $request->latitude, $request->longitude, 'masuk');
-
         // Tentukan status (telat atau hadir) berdasarkan jam masuk selesai
         $jamMasuk = Carbon::now();
         $jamMasukSelesai = Pengaturan::get('jam_masuk_selesai', '09:00');
         $status = $jamMasuk->format('H:i') > $jamMasukSelesai ? 'telat' : 'hadir';
 
+        // Simpan foto dengan watermark
+        try {
+            $fotoPath = $this->saveFotoWithWatermark($request->foto, $request->latitude, $request->longitude, 'masuk');
+        } catch (\Exception $e) {
+            \Log::error('Save photo error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Gagal menyimpan foto. Coba lagi.'], 500);
+        }
+
         // Simpan atau update absensi
-        if ($absensi) {
-            $absensi->update([
-                'jam_masuk' => $jamMasuk,
-                'foto_masuk' => $fotoPath,
-                'latitude_masuk' => $request->latitude,
-                'longitude_masuk' => $request->longitude,
-                'ip_address' => $request->ip(),
-                'status' => $status,
-            ]);
-        } else {
-            Absensi::create([
-                'karyawan_id' => $request->karyawan_id,
-                'tanggal' => $today,
-                'jam_masuk' => $jamMasuk,
-                'foto_masuk' => $fotoPath,
-                'latitude_masuk' => $request->latitude,
-                'longitude_masuk' => $request->longitude,
-                'ip_address' => $request->ip(),
-                'status' => $status,
-            ]);
+        try {
+            if ($absensi) {
+                $absensi->update([
+                    'jam_masuk' => $jamMasuk,
+                    'foto_masuk' => $fotoPath,
+                    'latitude_masuk' => $request->latitude,
+                    'longitude_masuk' => $request->longitude,
+                    'ip_address' => $request->ip(),
+                    'status' => $status,
+                ]);
+            } else {
+                Absensi::create([
+                    'karyawan_id' => $request->karyawan_id,
+                    'tanggal' => $today,
+                    'jam_masuk' => $jamMasuk,
+                    'foto_masuk' => $fotoPath,
+                    'latitude_masuk' => $request->latitude,
+                    'longitude_masuk' => $request->longitude,
+                    'ip_address' => $request->ip(),
+                    'status' => $status,
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Database error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Gagal menyimpan absensi. Coba lagi.'], 500);
         }
 
         return response()->json(['success' => true, 'message' => 'Absen masuk berhasil!', 'status' => $status]);
@@ -279,15 +296,25 @@ class AbsensiController extends Controller
         }
 
         // Simpan foto dengan watermark
-        $fotoPath = $this->saveFotoWithWatermark($request->foto, $request->latitude, $request->longitude, 'keluar');
+        try {
+            $fotoPath = $this->saveFotoWithWatermark($request->foto, $request->latitude, $request->longitude, 'keluar');
+        } catch (\Exception $e) {
+            \Log::error('Save photo error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Gagal menyimpan foto. Coba lagi.'], 500);
+        }
 
         // Update absensi
-        $absensi->update([
-            'jam_keluar' => Carbon::now(),
-            'foto_keluar' => $fotoPath,
-            'latitude_keluar' => $request->latitude,
-            'longitude_keluar' => $request->longitude,
-        ]);
+        try {
+            $absensi->update([
+                'jam_keluar' => Carbon::now(),
+                'foto_keluar' => $fotoPath,
+                'latitude_keluar' => $request->latitude,
+                'longitude_keluar' => $request->longitude,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Database error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Gagal menyimpan absensi. Coba lagi.'], 500);
+        }
 
         return response()->json(['success' => true, 'message' => 'Absen keluar berhasil!']);
     }
@@ -295,37 +322,80 @@ class AbsensiController extends Controller
     // Simpan foto dengan watermark
     private function saveFotoWithWatermark($base64Image, $lat, $long, $type)
     {
-        // Decode base64
-        $image = str_replace('data:image/png;base64,', '', $base64Image);
-        $image = str_replace(' ', '+', $image);
-        $imageData = base64_decode($image);
+        try {
+            // Deteksi format gambar (PNG atau JPEG)
+            $imageFormat = 'png';
+            if (strpos($base64Image, 'data:image/jpeg') !== false) {
+                $imageFormat = 'jpeg';
+                $image = str_replace('data:image/jpeg;base64,', '', $base64Image);
+            } else {
+                $image = str_replace('data:image/png;base64,', '', $base64Image);
+            }
+            
+            $image = str_replace(' ', '+', $image);
+            $imageData = base64_decode($image);
 
-        // Buat nama file
-        $filename = time() . '_' . $type . '_' . uniqid() . '.png';
-        $path = 'absensi/' . date('Y/m');
-        
-        // Pastikan direktori ada
-        if (!Storage::disk('public')->exists($path)) {
-            Storage::disk('public')->makeDirectory($path);
+            // Buat nama file
+            $extension = $imageFormat == 'jpeg' ? 'jpg' : 'png';
+            $filename = time() . '_' . $type . '_' . uniqid() . '.' . $extension;
+            $path = 'absensi/' . date('Y/m');
+            
+            // Pastikan direktori ada
+            if (!Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->makeDirectory($path, 0755, true);
+            }
+
+            $fullPath = storage_path('app/public/' . $path . '/' . $filename);
+
+            // Simpan gambar sementara
+            file_put_contents($fullPath, $imageData);
+
+            // Tambahkan watermark menggunakan GD (dengan error handling)
+            try {
+                $this->addWatermark($fullPath, $lat, $long, $imageFormat);
+            } catch (\Exception $e) {
+                // Jika watermark gagal, lanjutkan tanpa watermark
+                \Log::error('Watermark failed: ' . $e->getMessage());
+            }
+
+            return $path . '/' . $filename;
+        } catch (\Exception $e) {
+            \Log::error('Save photo failed: ' . $e->getMessage());
+            throw $e;
         }
-
-        $fullPath = storage_path('app/public/' . $path . '/' . $filename);
-
-        // Simpan gambar sementara
-        file_put_contents($fullPath, $imageData);
-
-        // Tambahkan watermark menggunakan GD
-        $this->addWatermark($fullPath, $lat, $long);
-
-        return $path . '/' . $filename;
     }
 
     // Tambahkan watermark ke gambar
-    private function addWatermark($imagePath, $lat, $long)
+    private function addWatermark($imagePath, $lat, $long, $format = 'png')
     {
-        $image = imagecreatefrompng($imagePath);
+        // Cek apakah file ada
+        if (!file_exists($imagePath)) {
+            throw new \Exception('Image file not found');
+        }
+
+        // Set memory limit untuk image processing
+        $currentMemory = ini_get('memory_limit');
+        ini_set('memory_limit', '256M');
+
+        // Load image berdasarkan format
+        if ($format == 'jpeg') {
+            $image = @imagecreatefromjpeg($imagePath);
+        } else {
+            $image = @imagecreatefrompng($imagePath);
+        }
+        
+        if (!$image) {
+            // Restore memory limit
+            ini_set('memory_limit', $currentMemory);
+            throw new \Exception('Failed to create image from file');
+        }
+
         $width = imagesx($image);
         $height = imagesy($image);
+
+        // Enable alpha blending
+        imagealphablending($image, true);
+        imagesavealpha($image, true);
 
         // Warna untuk teks (putih dengan background hitam semi-transparan)
         $white = imagecolorallocate($image, 255, 255, 255);
@@ -349,9 +419,17 @@ class AbsensiController extends Controller
         imagestring($image, $fontSize, $x, $y, $datetime, $white);
         imagestring($image, $fontSize, $x, $y + 15, $location, $white);
 
-        // Simpan gambar
-        imagepng($image, $imagePath);
+        // Simpan gambar berdasarkan format
+        if ($format == 'jpeg') {
+            imagejpeg($image, $imagePath, 85); // Quality 85 untuk JPEG
+        } else {
+            imagepng($image, $imagePath, 6); // Compression level 6 untuk PNG
+        }
+        
         imagedestroy($image);
+
+        // Restore memory limit
+        ini_set('memory_limit', $currentMemory);
     }
 
     // Hitung jarak antara dua koordinat (Haversine formula)
