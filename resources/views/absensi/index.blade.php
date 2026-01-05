@@ -138,7 +138,24 @@
                     @php
                         $absensi = $absensisHariIni->get($karyawan->id);
                         $statusIcon = '';
+                        $jamMasukStr = '';
+                        $jamKeluarStr = '';
+                        
                         if ($absensi) {
+                            // Convert to string format jika ada
+                            if ($absensi->jam_masuk) {
+                                $jamMasukStr = $absensi->jam_masuk instanceof \Carbon\Carbon 
+                                    ? $absensi->jam_masuk->format('H:i') 
+                                    : date('H:i', strtotime($absensi->jam_masuk));
+                            }
+                            
+                            if ($absensi->jam_keluar) {
+                                $jamKeluarStr = $absensi->jam_keluar instanceof \Carbon\Carbon 
+                                    ? $absensi->jam_keluar->format('H:i') 
+                                    : date('H:i', strtotime($absensi->jam_keluar));
+                            }
+                            
+                            // Set status icon
                             if ($absensi->jam_masuk && $absensi->jam_keluar) {
                                 $statusIcon = '✅ ';
                             } elseif ($absensi->jam_masuk) {
@@ -147,8 +164,8 @@
                         }
                     @endphp
                     <option value="{{ $karyawan->id }}" 
-                            data-absen-masuk="{{ $absensi && $absensi->jam_masuk ? $absensi->jam_masuk->format('H:i') : '' }}"
-                            data-absen-keluar="{{ $absensi && $absensi->jam_keluar ? $absensi->jam_keluar->format('H:i') : '' }}"
+                            data-absen-masuk="{{ $jamMasukStr }}"
+                            data-absen-keluar="{{ $jamKeluarStr }}"
                             data-status="{{ $absensi && $absensi->status ? $absensi->status : '' }}">
                         {{ $statusIcon }}{{ $karyawan->nama }} - {{ $karyawan->jabatan }}
                     </option>
