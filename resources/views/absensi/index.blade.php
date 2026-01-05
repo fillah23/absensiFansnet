@@ -552,9 +552,9 @@
                     timer: 2000
                 });
 
-                // Reset form
+                // Reset form - redirect ke halaman utama menggunakan GET
                 setTimeout(() => {
-                    location.reload();
+                    window.location.href = '/';
                 }, 2000);
 
             } catch (error) {
