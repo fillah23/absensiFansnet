@@ -12,6 +12,26 @@ Route::post('/absensi/validate-ip', [AbsensiController::class, 'validateIp'])->n
 Route::post('/absensi/masuk', [AbsensiController::class, 'absenMasuk'])->name('absensi.masuk');
 Route::post('/absensi/keluar', [AbsensiController::class, 'absenKeluar'])->name('absensi.keluar');
 
+// Check IP Address (untuk debugging)
+Route::get('/check-ip', function () {
+    $ip = request()->ip();
+    $userAgent = request()->userAgent();
+    $allHeaders = request()->headers->all();
+    
+    return response()->json([
+        'ip_address' => $ip,
+        'user_agent' => $userAgent,
+        'all_ips' => [
+            'REMOTE_ADDR' => $_SERVER['REMOTE_ADDR'] ?? 'N/A',
+            'HTTP_CLIENT_IP' => $_SERVER['HTTP_CLIENT_IP'] ?? 'N/A',
+            'HTTP_X_FORWARDED_FOR' => $_SERVER['HTTP_X_FORWARDED_FOR'] ?? 'N/A',
+            'HTTP_X_REAL_IP' => $_SERVER['HTTP_X_REAL_IP'] ?? 'N/A',
+            'HTTP_CF_CONNECTING_IP' => $_SERVER['HTTP_CF_CONNECTING_IP'] ?? 'N/A',
+        ],
+        'headers' => $allHeaders,
+    ], 200, [], JSON_PRETTY_PRINT);
+})->name('check.ip');
+
 // Routes yang memerlukan login
 Route::middleware(['auth'])->group(function () {
     // Dashboard
