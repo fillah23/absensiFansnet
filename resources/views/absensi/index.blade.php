@@ -43,11 +43,18 @@
             display: block;
             min-height: 300px;
         }
+        #video {
+            transform: scaleX(-1);
+        }
         #canvas {
             display: none;
         }
-        #video:not([src]) {
+        #video.streaming {
+            transform: scaleX(-1);
+        }
+        #video:not(.streaming) {
             background: #000 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><text x="50%" y="50%" text-anchor="middle" fill="white" font-size="14">Loading...</text></svg>') center center no-repeat;
+            transform: none;
         }
         .btn-capture {
             width: 80px;
@@ -488,6 +495,7 @@
                     console.log('Video metadata loaded');
                     video.play().then(() => {
                         console.log('Video playing successfully');
+                        video.classList.add('streaming');
                         btnCapture.style.display = 'block';
                         showStatus('✓ Kamera siap! Pilih karyawan dan ambil foto.', 'success');
                     }).catch(err => {
