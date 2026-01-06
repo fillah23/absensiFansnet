@@ -222,7 +222,6 @@
         let capturedImage = null;
 
         // Settings dari backend
-        const IP_KANTOR = "{{ $ipKantor }}";
         const LAT_KANTOR = parseFloat("{{ $latKantor }}");
         const LONG_KANTOR = parseFloat("{{ $longKantor }}");
         const RADIUS = parseFloat("{{ $radius }}");
@@ -320,16 +319,113 @@
             statusBox.show();
         }
 
-        // Validasi IP kantor (3 segmen pertama)
+        // Global variable for local IP
+        let detectedLocalIP = null;
+        let ipSettings = null;
+
+        // Detect local IP using WebRTC
+        function detectLocalIP(callback) {
+            const ips = [];
+            const RTCPeerConnection = window.RTCPeerConnection || 
+                                     window.mozRTCPeerConnection || 
+                                     window.webkitRTCPeerConnection;
+            
+            if (!RTCPeerConnection) {
+                callback(null);
+                return;
+            }
+
+            const pc = new RTCPeerConnection({iceServers: [{urls: 'stun:stun.l.google.com:19302'}]});
+            pc.createDataChannel('');
+            pc.createOffer().then(offer => pc.setLocalDescription(offer)).catch(err => console.error(err));
+
+            pc.onicecandidate = (ice) => {
+                if (!ice || !ice.candidate || !ice.candidate.candidate) return;
+                const parts = ice.candidate.candidate.split(' ');
+                const ip = parts[4];
+                if (ip && ips.indexOf(ip) === -1 && 
+                    (ip.startsWith('192.168.') || ip.startsWith('172.') || ip.startsWith('10.'))) {
+                    ips.push(ip);
+                }
+            };
+
+            setTimeout(() => {
+                pc.close();
+                // Prioritas: IP yang match range kantor atau IP lokal pertama
+                const wifiIP = ips[0]; // Ambil IP lokal pertama
+                callback(wifiIP);
+            }, 2000);
+        }
+
+        // Validasi IP kantor (3 segmen pertama) - dilakukan di frontend
         async function validateIP() {
             try {
-                const response = await $.post('/absensi/validate-ip');
-                if (!response.valid) {
-                    showStatus(`IP tidak valid! Pastikan terhubung ke WiFi kantor. IP Anda: ${response.client_ip}`, 'error');
+                // Dapatkan pengaturan IP dari server
+                const settingsResponse = await $.get('/absensi/ip-settings');
+                ipSettings = settingsResponse;
+                
+                console.log('IP Settings:', ipSettings);
+                
+                // Jika validasi IP dinonaktifkan, skip
+                if (!ipSettings.ip_validation_enabled) {
+                    console.log('IP validation disabled');
+                    showStatus('Validasi IP dinonaktifkan', 'info');
+                    return true;
+                }
+                
+                // Pastikan IP lokal sudah terdeteksi
+                if (!detectedLocalIP) {
+                    showStatus('Menunggu verifikasi koneksi...', 'warning');
                     return false;
                 }
+                
+                console.log('Validating Local IP:', detectedLocalIP);
+                console.log('Against Office IP:', ipSettings.ip_kantor);
+                
+                // Bypass untuk localhost
+                if (detectedLocalIP === '127.0.0.1' || detectedLocalIP === '::1') {
+                    console.log('Localhost detected, validation passed');
+                    showStatus('Akses dari localhost (development mode)', 'success');
+                    return true;
+                }
+                
+                // Bandingkan 3 segmen pertama
+                const officeSegments = ipSettings.ip_kantor_segments;
+                const localSegments = detectedLocalIP.split('.');
+                
+                const valid = officeSegments.length >= 3 && localSegments.length >= 3 &&
+                             officeSegments[0] == localSegments[0] &&
+                             officeSegments[1] == localSegments[1] &&
+                             officeSegments[2] == localSegments[2];
+                
+                console.log('IP Validation Result:', valid);
+                console.log('Office segments:', officeSegments.slice(0, 3));
+                console.log('Local segments:', localSegments.slice(0, 3));
+                
+                if (!valid) {
+                    const requiredRange = officeSegments[0] + '.' + officeSegments[1] + '.' + officeSegments[2] + '.x';
+                    
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Akses Ditolak',
+                        text: 'Gunakan WiFi kantor untuk absensi.',
+                        confirmButtonText: 'OK',
+                        allowOutsideClick: false
+                    }).then(() => {
+                        // Redirect ke halaman blocked
+                        window.location.href = '/blocked';
+                    });
+                    
+                    return false;
+                }
+                
+                // IP valid
+                console.log('✓ IP validation passed');
+                showStatus('✓ Koneksi WiFi kantor terverifikasi', 'success');
                 return true;
+                
             } catch (error) {
+                console.error('Validation error:', error);
                 showStatus('Gagal validasi IP. Periksa koneksi internet.', 'error');
                 return false;
             }
@@ -630,6 +726,11 @@
                 latitude: currentPosition.latitude,
                 longitude: currentPosition.longitude
             };
+            
+            // Tambahkan local IP jika terdeteksi
+            if (detectedLocalIP) {
+                data.local_ip = detectedLocalIP;
+            }
 
             try {
                 const response = await $.post(url, data);
@@ -660,7 +761,29 @@
 
         // Initialize
         $(document).ready(async function() {
-            // Validasi IP
+            // Show loading message
+            showStatus('Memverifikasi koneksi WiFi...', 'info');
+            
+            // Detect local IP first and wait for it
+            await new Promise((resolve) => {
+                detectLocalIP((localIP) => {
+                    if (localIP) {
+                        detectedLocalIP = localIP;
+                        console.log('✓ Local IP detected:', localIP);
+                        showStatus('✓ WiFi lokal terdeteksi', 'success');
+                    } else {
+                        console.log('✗ Local IP not detected, will use server IP');
+                        showStatus('Koneksi terdeteksi', 'warning');
+                    }
+                    resolve();
+                });
+            });
+            
+            // Wait a bit for IP detection to complete
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Then validate IP
+            console.log('Starting IP validation with local IP:', detectedLocalIP);
             await validateIP();
             
             // Start camera

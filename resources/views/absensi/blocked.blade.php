@@ -22,7 +22,7 @@
                     <div class="alert alert-danger mt-4">
                         <h5 class="alert-heading"><i class="bi bi-wifi-off"></i> Koneksi Tidak Valid</h5>
                         <hr>
-                        <p class="mb-0">Sistem mendeteksi bahwa Anda tidak terhubung ke jaringan WiFi kantor. Silakan pastikan perangkat Anda terhubung ke WiFi kantor yang telah ditentukan.</p>
+                        <p class="mb-0">Sistem mendeteksi bahwa Anda tidak terhubung ke jaringan WiFi kantor. Silakan pastikan perangkat Anda terhubung ke WiFi kantor yang benar.</p>
                     </div>
 
                     <div class="card mt-4 border-primary">

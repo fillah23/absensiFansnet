@@ -12,47 +12,11 @@ use Carbon\Carbon;
 
 class AbsensiController extends Controller
 {
+    // Note: IP validation removed from backend - all validation done in frontend using WebRTC
+    
     // Halaman absensi public (tanpa login)
     public function index()
     {
-        // Cek apakah validasi IP diaktifkan
-        $ipValidationEnabled = Pengaturan::get('ip_validation_enabled', '1');
-        
-        // Set default value untuk ipKantor
-        $ipKantor = Pengaturan::get('ip_kantor', '0.0.0.0');
-        
-        // Jika validasi IP aktif, lakukan pengecekan
-        if ($ipValidationEnabled == '1') {
-            // Validasi IP dulu sebelum menampilkan halaman
-            $clientIp = request()->ip();
-            
-            // Bypass validation untuk localhost dalam development mode
-            // CATATAN: Untuk production, hapus bagian ini agar IP validation ketat
-            $isLocalhost = in_array($clientIp, ['127.0.0.1', '::1', 'localhost']);
-            
-            if (!$isLocalhost) {
-                // Ambil 3 segmen pertama dari IP
-                $ipKantorSegments = explode('.', $ipKantor);
-                $clientIpSegments = explode('.', $clientIp);
-                
-                // Bandingkan 3 segmen pertama saja
-                $validIp = count($ipKantorSegments) >= 3 && count($clientIpSegments) >= 3 &&
-                           $ipKantorSegments[0] == $clientIpSegments[0] &&
-                           $ipKantorSegments[1] == $clientIpSegments[1] &&
-                           $ipKantorSegments[2] == $clientIpSegments[2];
-                
-                // Jika IP tidak valid, tampilkan halaman error
-                if (!$validIp) {
-                    $requiredIpRange = $ipKantorSegments[0] . '.' . $ipKantorSegments[1] . '.' . $ipKantorSegments[2] . '.x';
-                    return view('absensi.blocked', [
-                        'client_ip' => $clientIp,
-                        'required_ip_range' => $requiredIpRange,
-                        'show_localhost_warning' => true
-                    ]);
-                }
-            }
-        }
-        
         // Jika bukan localhost dan bukan HTTPS, peringatkan tentang GPS/Camera
         if (!request()->secure() && !in_array(request()->getHost(), ['localhost', '127.0.0.1'])) {
             return view('absensi.secure-warning', [
@@ -77,53 +41,20 @@ class AbsensiController extends Controller
         $jamKeluarMulai = Pengaturan::get('jam_keluar_mulai', '16:00');
         $jamKeluarSelesai = Pengaturan::get('jam_keluar_selesai', '20:00');
 
-        return view('absensi.index', compact('karyawans', 'absensisHariIni', 'ipKantor', 'latKantor', 'longKantor', 'radius', 
+        return view('absensi.index', compact('karyawans', 'absensisHariIni', 'latKantor', 'longKantor', 'radius', 
             'jamMasukMulai', 'jamMasukSelesai', 'jamKeluarMulai', 'jamKeluarSelesai'));
     }
 
-    // Validasi IP (3 segmen pertama saja, digit terakhir bebas)
-    public function validateIp(Request $request)
+    // API untuk mendapatkan pengaturan IP (untuk validasi di frontend)
+    public function getIpSettings(Request $request)
     {
-        // Cek apakah validasi IP diaktifkan
         $ipValidationEnabled = Pengaturan::get('ip_validation_enabled', '1');
+        $ipKantor = Pengaturan::get('ip_kantor', '0.0.0.0');
         
-        // Jika validasi IP dinonaktifkan, langsung return valid
-        if ($ipValidationEnabled != '1') {
-            return response()->json([
-                'valid' => true,
-                'client_ip' => $request->ip(),
-                'required_ip_range' => 'Validasi IP dinonaktifkan'
-            ]);
-        }
-        
-        $ipKantor = Pengaturan::get('ip_kantor');
-        $clientIp = $request->ip();
-
-        // Bypass validation untuk localhost dalam development mode
-        $isLocalhost = in_array($clientIp, ['127.0.0.1', '::1', 'localhost']);
-        
-        if ($isLocalhost) {
-            return response()->json([
-                'valid' => true,
-                'client_ip' => $clientIp,
-                'required_ip_range' => 'localhost (development mode)'
-            ]);
-        }
-
-        // Ambil 3 segmen pertama dari IP (contoh: 172.22.4)
-        $ipKantorSegments = explode('.', $ipKantor);
-        $clientIpSegments = explode('.', $clientIp);
-        
-        // Bandingkan 3 segmen pertama saja
-        $valid = count($ipKantorSegments) >= 3 && count($clientIpSegments) >= 3 &&
-                 $ipKantorSegments[0] == $clientIpSegments[0] &&
-                 $ipKantorSegments[1] == $clientIpSegments[1] &&
-                 $ipKantorSegments[2] == $clientIpSegments[2];
-
         return response()->json([
-            'valid' => $valid,
-            'client_ip' => $clientIp,
-            'required_ip_range' => $ipKantorSegments[0] . '.' . $ipKantorSegments[1] . '.' . $ipKantorSegments[2] . '.x'
+            'ip_validation_enabled' => $ipValidationEnabled == '1',
+            'ip_kantor' => $ipKantor,
+            'ip_kantor_segments' => explode('.', $ipKantor),
         ]);
     }
 
@@ -139,32 +70,6 @@ class AbsensiController extends Controller
 
         // Tidak ada validasi waktu - bisa absen masuk kapan saja
         // Jika lewat jam selesai akan masuk sebagai "telat"
-
-        // Cek apakah validasi IP diaktifkan
-        $ipValidationEnabled = Pengaturan::get('ip_validation_enabled', '1');
-        
-        if ($ipValidationEnabled == '1') {
-            // Cek IP (3 segmen pertama saja)
-            $ipKantor = Pengaturan::get('ip_kantor');
-            $clientIp = $request->ip();
-            
-            // Bypass validation untuk localhost dalam development mode
-            $isLocalhost = in_array($clientIp, ['127.0.0.1', '::1', 'localhost']);
-            
-            if (!$isLocalhost) {
-                $ipKantorSegments = explode('.', $ipKantor);
-                $clientIpSegments = explode('.', $clientIp);
-                
-                $ipValid = count($ipKantorSegments) >= 3 && count($clientIpSegments) >= 3 &&
-                           $ipKantorSegments[0] == $clientIpSegments[0] &&
-                           $ipKantorSegments[1] == $clientIpSegments[1] &&
-                           $ipKantorSegments[2] == $clientIpSegments[2];
-                
-                if (!$ipValid) {
-                    return response()->json(['success' => false, 'message' => 'IP tidak valid. Pastikan Anda terhubung ke WiFi kantor.'], 403);
-                }
-            }
-        }
 
         // Cek jarak
         $latKantor = floatval(Pengaturan::get('latitude_kantor'));
@@ -243,32 +148,6 @@ class AbsensiController extends Controller
 
         // Tidak ada validasi waktu untuk absen keluar - bisa kapan saja setelah absen masuk
         // Karyawan bisa pulang lebih awal atau lembur
-
-        // Cek apakah validasi IP diaktifkan
-        $ipValidationEnabled = Pengaturan::get('ip_validation_enabled', '1');
-        
-        if ($ipValidationEnabled == '1') {
-            // Cek IP (3 segmen pertama saja)
-            $ipKantor = Pengaturan::get('ip_kantor');
-            $clientIp = $request->ip();
-            
-            // Bypass validation untuk localhost dalam development mode
-            $isLocalhost = in_array($clientIp, ['127.0.0.1', '::1', 'localhost']);
-            
-            if (!$isLocalhost) {
-                $ipKantorSegments = explode('.', $ipKantor);
-                $clientIpSegments = explode('.', $clientIp);
-                
-                $ipValid = count($ipKantorSegments) >= 3 && count($clientIpSegments) >= 3 &&
-                           $ipKantorSegments[0] == $clientIpSegments[0] &&
-                           $ipKantorSegments[1] == $clientIpSegments[1] &&
-                           $ipKantorSegments[2] == $clientIpSegments[2];
-                
-                if (!$ipValid) {
-                    return response()->json(['success' => false, 'message' => 'IP tidak valid. Pastikan Anda terhubung ke WiFi kantor.'], 403);
-                }
-            }
-        }
 
         // Cek jarak
         $latKantor = floatval(Pengaturan::get('latitude_kantor'));
